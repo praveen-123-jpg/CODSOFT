@@ -1,0 +1,41 @@
+def play_game():
+    print("Welcome to Tic-Tac-Toe!")
+    game = TicTacToe()
+    ai_player = AIPlayer('O')
+
+    while game.empty_squares() and not game.current_winner:
+        if game.current_winner:
+            break
+        if len(game.available_moves()) == 0:
+            break
+        print("\nCurrent Board:")
+        game.print_board()
+        print("\nAvailable moves:")
+        game.print_board_nums()
+
+        user_move = None
+        while user_move not in game.available_moves():
+            try:
+                user_move = int(input("\nYour move. Choose a position (0-8): "))
+            except ValueError:
+                print("Invalid input. Please enter a number between 0 and 8.")
+                continue
+
+        game.make_move(user_move, 'X')
+
+        if game.current_winner:
+            break
+
+        ai_move = ai_player.get_move(game)
+        game.make_move(ai_move, ai_player.letter)
+
+    print("\nFinal Board:")
+    game.print_board()
+
+    if game.current_winner:
+        print(f"\n{game.current_winner} wins!")
+    else:
+        print("\nIt's a tie!")
+
+if __name__ == "__main__":
+    play_game()
