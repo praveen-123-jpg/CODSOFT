@@ -1,0 +1,72 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Model
+from tensorflow.keras.preprocessing import image
+from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input
+from tensorflow.keras.layers import Input, Dense, LSTM, Embedding, Dropout, add
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.preprocessing.text import Tokenizer
+
+# Load the pre-trained ResNet50 model
+base_model = ResNet50(weights='imagenet')
+model = Model(inputs=base_model.input, outputs=base_model.get_layer('avg_pool').output)
+
+def extract_features(img_path, model):
+    img = image.load_img(img_path, target_size=(224, 224))
+    img_data = image.img_to_array(img)
+    img_data = np.expand_dims(img_data, axis=0)
+    img_data = preprocess_input(img_data)
+    features = model.predict(img_data)
+    return features
+
+# Define the caption generation model
+def build_caption_model(vocab_size, max_length):
+    inputs1 = Input(shape=(2048,))
+    fe1 = Dropout(0.5)(inputs1)
+    fe2 = Dense(256, activation='relu')(fe1)
+    
+    inputs2 = Input(shape=(max_length,))
+    se1 = Embedding(vocab_size, 256, mask_zero=True)(inputs2)
+    se2 = Dropout(0.5)(se1)
+    se3 = LSTM(256)(se2)
+    
+    decoder1 = add([fe2, se3])
+    decoder2 = Dense(256, activation='relu')(decoder1)
+    outputs = Dense(vocab_size, activation='softmax')(decoder2)
+    
+    model = Model(inputs=[inputs1, inputs2], outputs=outputs)
+    model.compile(loss='categorical_crossentropy', optimizer='adam')
+    return model
+
+# Generate caption
+def generate_caption(model, tokenizer, photo, max_length):
+    in_text = 'startseq'
+    for _ in range(max_length):
+        sequence = tokenizer.texts_to_sequences([in_text])[0]
+        sequence = pad_sequences([sequence], maxlen=max_length)
+        yhat = model.predict([photo, sequence], verbose=0)
+        yhat = np.argmax(yhat)
+        word = tokenizer.index_word[yhat]
+        if word is None:
+            break
+        in_text += ' ' + word
+        if word == 'endseq':
+            break
+    return in_text
+
+# Example usage
+if __name__ == "__main__":
+    # Assume we have the following pre-trained tokenizer and model
+    max_length = 34  # The maximum length of the caption
+    tokenizer = Tokenizer()
+    tokenizer.fit_on_texts(["startseq a dog is running endseq", "startseq a cat is sleeping endseq"])  # Dummy fitting
+    vocab_size = len(tokenizer.word_index) + 1
+    
+    caption_model = build_caption_model(vocab_size, max_length)
+    
+    # Load an example image and generate caption
+    img_path = 'example.jpg'  # Replace with the path to your image
+    photo = extract_features(img_path, model)
+    caption = generate_caption(caption_model, tokenizer, photo, max_length)
+    print(caption)
