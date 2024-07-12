@@ -1,0 +1,20 @@
+def hybrid_recommendations(user_id, title, model, data, cosine_sim=cosine_sim, top_n=10):
+    # Get collaborative filtering recommendations
+    user_ratings = data[data['userId'] == user_id]
+    user_ratings = user_ratings.merge(movies, on='movieId')
+    cf_recommendations = []
+    for movie in user_ratings['movieId']:
+        pred = model.predict(user_id, movie)
+        cf_recommendations.append((movie, pred.est))
+    cf_recommendations = sorted(cf_recommendations, key=lambda x: x[1], reverse=True)[:top_n]
+
+    # Get content-based recommendations
+    content_recommendations = get_content_based_recommendations(title)
+
+    # Combine both recommendations
+    combined_recommendations = list(set([x[0] for x in cf_recommendations] + content_recommendations.tolist()))
+    
+    return combined_recommendations[:top_n]
+
+# Example usage
+hybrid_recommendations(user_id=1, title='The Godfather', model=model, data=ratings)
